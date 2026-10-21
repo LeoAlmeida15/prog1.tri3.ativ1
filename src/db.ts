@@ -2,7 +2,7 @@ import { Database } from "bun:sqlite";
 
 const db = new Database("database.sqlite");
 
-const query = db.query(`
+db.run(`
     CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         username TEXT NOT NULL UNIQUE,
@@ -17,9 +17,5 @@ const query = db.query(`
         ingredientes VARCHAR,
         preparo VARCHAR,
         categoria VARCHAR
-    )
+    );
 `);
-
-query.run();
-
-export { db };
