@@ -1,93 +1,52 @@
-import { db } from "./database.ts";
+import login from "./index.html"
+import home from "./home.html"
+import db from "./db"
+
+const loggedUsers: any = {}
 
 const srv = Bun.serve({
     port: 3000,
-
     routes: {
-        "/": {
-            GET: (req) => {
-                const url = new URL(req.url);
-                const search = url.searchParams;
-                const nome = search.get("nome");
+        "/": login,
+        "/home": home,
 
-                console.log(nome);
-
-                return new Response("oi " + nome);
-            },
-        },
-
-        "/pessoa/:id": {
-            GET: (req) => {
-                return new Response(`oi ${req.params.id}`);
+        "/user": {
+            POST: async (req) => {
+                const body = await req.body?.json()
+                const query = db.query(`INSERT INTO user(username, password_hash) VALUES(:username, :password_hash)`)
+                const hash = await Bun.password.hash(body.password)
+                const data = query.run({ ":username": body.username, ":password_hash": hash })
+                return Response.json(data)
             }
         },
 
-        "/test": {
-            GET: (req) => {
-                const url = new URL(req.url);
-                const search = url.searchParams;
-                const nome = search.get("nome");
-
-                console.log(nome);
-
-                return new Response("LeoAlm3ida_GET");
-            },
-
+        "/login": {
             POST: async (req) => {
-                const body = await req.text();
-                console.log(body);
-
-                return new Response("LeoAlm3ida_POST");
-            },
-
-            PUT: () => new Response("LeoAlm3ida_PUT"),
-
-            DELETE: () => new Response("LeoAlm3ida_DELETE")
+                const body = await req.body?.json()
+                const query = db.query(`SELECT * FROM user WHERE username=:username LIMIT 1`)
+                const data: any = query.get({ ":username": body.username })
+                if (!data)
+                    return Response.json({ msg: "usuário não encontrado" }, { status: 404 })
+                const hash = data.password_hash
+                const isMatch = await Bun.password.verify(body.password, hash)
+                if (!isMatch)
+                    return Response.json({ msg: "senha incorreta" }, { status: 401 })
+                const uuid = crypto.randomUUID()
+                delete data.password_hash
+                loggedUsers[uuid] = data
+                req.cookies.set("ses", uuid)
+                return Response.json(isMatch)
+            }
         },
 
-        "/cadastro": {
-            GET: () => {
-                return new Response(Bun.file("cadastro.html"));
-            },
-
-            POST: async (req) => {
-                const body = await req.json();
-
-                const { username, email, password } = body;
-
-                if (!username || !email || !password) {
-                    return new Response("Preencha todos os campos", {
-                        status: 400
-                    });
-                }
-
-                if (password.length < 6) {
-                    return new Response("A senha deve ter pelo menos 6 caracteres", {
-                        status: 400
-                    });
-                }
-
-                try {
-                    const passwordHash = await Bun.password.hash(password);
-
-                    db.query(`
-                        INSERT INTO users (username, email, password_hash)
-                        VALUES (?, ?, ?)
-                    `).run(username, email, passwordHash);
-
-                    return new Response("Cadastro realizado com sucesso!", {
-                        status: 201
-                    });
-                } catch {
-                    return new Response("Usuário ou e-mail já cadastrado", {
-                        status: 409
-                    });
-                }
-            }
+        "/login/user": (req) => {
+            const ses = req.cookies.get("ses") as string
+            const data = loggedUsers[ses]
+            if (!ses || !data)
+                return Response.json({ msg: "usuário não esta logado" }, { status: 401 })
+            return Response.json(data)
         }
     }
-});
+})
 
-console.log(`Servidor rodando: ${srv.url}`);
-
-
+console.log(`Server running on ${srv.url}`)
