@@ -1,66 +1,52 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
+
 <head>
     <meta charset="UTF-8">
-    <title>Cadastro</title>
+    <title>Login</title>
 </head>
+
 <body>
-    <h1>Cadastro de usuário</h1>
-
     <form>
-        <input
-            type="text"
-            name="username"
-            placeholder="Nome de usuário"
-            required
-        >
-
-        <br><br>
-
-        <input
-            type="email"
-            name="email"
-            placeholder="E-mail"
-            required
-        >
-
-        <br><br>
-
-        <input
-            type="password"
-            name="password"
-            placeholder="Senha"
-            minlength="6"
-            required
-        >
-
-        <br><br>
-
-        <button type="submit">Cadastrar</button>
+        <input type="text" name="username" placeholder="email de login">
+        <input type="password" name="password" placeholder="senha">
+        <button>entrar</button>
     </form>
-
+    <form>
+        <input type="text" name="username" placeholder="email de login">
+        <input type="pasasword" name="password" placeholder="senha">
+        <button>cadastrar-se</button>
+    </form>
     <script>
-        const form = document.querySelector("form");
+        const frmLogin = document.querySelector('form')
+        
+        frmLogin.addEventListener('submit', async (ev) => {
+            ev.preventDefault()
 
-        form.addEventListener("submit", async (ev) => {
-            ev.preventDefault();
-
-            const response = await fetch("/cadastro", {
+            const response = await fetch("/login", {
                 method: "POST",
-                headers: {
-                    "Content-Type": "application/json"
-                },
+                headers: { "Content-type": "application/json" },
                 body: JSON.stringify({
-                    username: form.username.value,
-                    email: form.email.value,
-                    password: form.password.value
+                    "username": frmLogin.username.value,
+                    "password": frmLogin.password.value
                 })
-            });
+            })  
 
-            const mensagem = await response.text();
 
-            alert(mensagem);
-        });
+            if (response.status == 404)
+                return alert("Usuário não encontrado")
+
+            if (response.status == 401)
+                return alert("Senha incorreta")
+
+            if (response.ok) {
+                window.location.href = "/home"
+                return
+            }
+
+            alert("Não deveria chegar aqui")
+        }) 
     </script>
 </body>
+
 </html>
