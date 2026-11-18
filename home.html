@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Home</title>
+    <link rel="stylesheet" href="./style.css">
+</head>
+
+<body>
+    <header class="header">
+        <a class="logo" href="/home">Fome<span>Já</span></a>
+        <div class="profile">
+            <div class="thumb">?</div>
+            <div class="username">...</div>
+        </div>
+    </header>
+
+    <section class="banner">
+        <h1>O que você quer comer hoje?</h1>
+        <p>Escolha um restaurante, monte o carrinho e peça.</p>
+    </section>
+
+    <main class="container">
+        <div class="filters">
+            <input id="busca" placeholder="Pesquisar restaurante">
+            <select id="categoria">
+                <option value="">Todas as categorias</option>
+                <option>Pizza</option>
+                <option>Lanches</option>
+                <option>Japonesa</option>
+                <option>Sobremesas</option>
+            </select>
+            <button class="btn" onclick="carregarRestaurantes()">Buscar</button>
+        </div>
+
+        <div class="section-title">
+            <h2>Restaurantes</h2>
+        </div>
+        <div id="restaurantes" class="restaurant-grid"></div>
+
+        <div class="section-title">
+            <h2 id="tituloCardapio">Cardápio</h2>
+        </div>
+        <div class="layout">
+            <div id="cardapio"><p class="empty">Escolha um restaurante para ver o cardápio.</p></div>
+
+            <aside class="cart">
+                <h3>🛒 Seu carrinho</h3>
+                <div id="carrinho"><p class="empty">Vazio</p></div>
+
+                <h4>Observações</h4>
+                <input id="obs" placeholder="ex.: sem cebola">
+
+                <h4>Pagamento</h4>
+                <select id="pagamento">
+                    <option>Pix</option>
+                    <option>Cartão</option>
+                    <option>Dinheiro</option>
+                </select>
+
+                <h4>Endereço de entrega</h4>
+                <input id="rua" placeholder="Rua">
+                <input id="numero" placeholder="Número">
+                <input id="bairro" placeholder="Bairro">
+                <input id="cidade" placeholder="Cidade">
+
+                <button class="btn block" onclick="finalizarPedido()">Finalizar pedido</button>
+            </aside>
+        </div>
+
+        <div class="section-title">
+            <h2>Meus pedidos</h2>
+            <button class="btn outline small" onclick="carregarPedidos()">Atualizar</button>
+        </div>
+        <div id="pedidos"></div>
+    </main>
+
+    <footer>FomeJá - projeto de estudo</footer>
+
+    <script>
+        // Variáveis que guardam o estado da página
+        let restauranteAtual = 0     // id do restaurante que está aberto
+        let taxaAtual = 0            // taxa de entrega desse restaurante
+        let carrinho = []            // lista com os itens escolhidos
+
+        // Se o valor for vazio (null), devolve um texto em branco
+        function texto(valor) {
+            if (valor == null) {
+                return ""
+            }
+            return valor
+        }
+
+        // Roda quando a página abre: confere se tem alguém logado
+        async function init() {
+            const response = await fetch("/login/user")
+
+            if (!response.ok) {
+                alert("Usuário não logado")
+                window.location.href = "/"
+                return
+            }
+
+            const data = await response.json()
+            document.querySelector(".profile .username").textContent = data.username
+            document.querySelector(".profile .thumb").textContent = data.username[0]
+
+            carregarRestaurantes()
+            carregarPedidos()
+        }
+
+        // Busca os restaurantes no servidor e mostra na tela
+        async function carregarRestaurantes() {
+            const busca = document.querySelector("#busca").value
+            const categoria = document.querySelector("#categoria").value
+
+            const response = await fetch("/restaurants?busca=" + busca + "&categoria=" + categoria)
+            const lista = await response.json()
+
+            let html = ""
+
+            for (let i = 0; i < lista.length; i++) {
+                const r = lista[i]
+
+                html += '<div class="restaurant-card">'
+                html += '<div class="cover">🍽️</div>'
+                html += '<div class="info">'
+                html += '<span class="tag">' + texto(r.category) + '</span>'
+                html += '<h3>' + r.name + '</h3>'
+                html += '<p>' + texto(r.description) + '</p>'
+                html += '<div class="meta">'
+                html += '<span>⏱ ' + r.delivery_time + ' min</span>'
+                html += '<span>🛵 R$ ' + r.delivery_fee.toFixed(2) + '</span>'
+                html += '</div>'
+                html += '<button class="btn small" onclick="abrirCardapio(' + r.id + ')">Ver cardápio</button>'
+                html += '</div>'
+                html += '</div>'
+            }
+
+            if (html == "") {
+                html = '<p class="empty">Nenhum restaurante encontrado</p>'
+            }
+
+            document.querySelector("#restaurantes").innerHTML = html
+        }
+
+        // Mostra os pratos de um restaurante
+        async function abrirCardapio(id) {
+            // Pega os dados do restaurante para saber o nome e a taxa
+            const resposta1 = await fetch("/restaurants")
+            const restaurantes = await resposta1.json()
+
+            for (let i = 0; i < restaurantes.length; i++) {
+                if (restaurantes[i].id == id) {
+                    taxaAtual = restaurantes[i].delivery_fee
+                    document.querySelector("#tituloCardapio").textContent = "Cardápio - " + restaurantes[i].name
+                }
+            }
+
+            // Se trocou de restaurante, esvazia o carrinho
+            if (restauranteAtual != id) {
+                carrinho = []
+            }
+            restauranteAtual = id
+            mostrarCarrinho()
+
+            // Busca os pratos
+            const resposta2 = await fetch("/restaurants/" + id + "/dishes")
+            const pratos = await resposta2.json()
+
+            let html = ""
+
+            for (let i = 0; i < pratos.length; i++) {
+                const p = pratos[i]
+
+                html += '<div class="dish">'
+                html += '<div>'
+                html += '<h4>' + p.name + '</h4>'
+                html += '<p>' + texto(p.description) + '</p>'
+                html += '<p>Ingredientes: ' + texto(p.ingredients) + '</p>'
+                html += '<div class="price">R$ ' + p.price.toFixed(2) + '</div>'
+                html += '</div>'
+                html += '<div class="side">'
+                html += '<button class="btn small" onclick="adicionar(' + p.id + ')">Adicionar</button>'
+                html += '</div>'
+                html += '</div>'
+            }
+
+            document.querySelector("#cardapio").innerHTML = html
+        }
+
+        // Coloca um prato no carrinho
+        async function adicionar(idPrato) {
+            // Busca os pratos de novo para pegar o nome e o preço
+            const response = await fetch("/restaurants/" + restauranteAtual + "/dishes")
+            const pratos = await response.json()
+
+            let prato = null
+            for (let i = 0; i < pratos.length; i++) {
+                if (pratos[i].id == idPrato) {
+                    prato = pratos[i]
+                }
+            }
+
+            // Se o prato já está no carrinho, só aumenta a quantidade
+            for (let i = 0; i < carrinho.length; i++) {
+                if (carrinho[i].dish_id == idPrato) {
+                    carrinho[i].quantity = carrinho[i].quantity + 1
+                    mostrarCarrinho()
+                    return
+                }
+            }
+
+            // Se não está, adiciona um novo item
+            carrinho.push({
+                dish_id: prato.id,
+                nome: prato.name,
+                preco: prato.price,
+                quantity: 1
+            })
+            mostrarCarrinho()
+        }
+
+        // Tira um prato do carrinho
+        function remover(idPrato) {
+            const novoCarrinho = []
+
+            for (let i = 0; i < carrinho.length; i++) {
+                if (carrinho[i].dish_id != idPrato) {
+                    novoCarrinho.push(carrinho[i])
+                }
+            }
+
+            carrinho = novoCarrinho
+            mostrarCarrinho()
+        }
+
+        // Desenha o carrinho na tela
+        function mostrarCarrinho() {
+            if (carrinho.length == 0) {
+                document.querySelector("#carrinho").innerHTML = '<p class="empty">Vazio</p>'
+                return
+            }
+
+            let html = ""
+            let subtotal = 0
+
+            for (let i = 0; i < carrinho.length; i++) {
+                const item = carrinho[i]
+                const valor = item.preco * item.quantity
+                subtotal = subtotal + valor
+
+                html += '<div class="cart-item">'
+                html += '<span>' + item.quantity + 'x ' + item.nome + '</span>'
+                html += '<span>R$ ' + valor.toFixed(2)
+                html += ' <button class="btn outline small" onclick="remover(' + item.dish_id + ')">x</button>'
+                html += '</span>'
+                html += '</div>'
+            }
+
+            const total = subtotal + taxaAtual
+
+            html += '<div class="cart-item"><span>Taxa de entrega</span><span>R$ ' + taxaAtual.toFixed(2) + '</span></div>'
+            html += '<div class="cart-total"><span>Total</span><span>R$ ' + total.toFixed(2) + '</span></div>'
+
+            document.querySelector("#carrinho").innerHTML = html
+        }
+
+        // Envia o pedido para o servidor
+        async function finalizarPedido() {
+            if (carrinho.length == 0) {
+                alert("Carrinho vazio")
+                return
+            }
+
+            // Monta a lista de itens só com o que o servidor precisa
+            const itens = []
+            for (let i = 0; i < carrinho.length; i++) {
+                itens.push({
+                    dish_id: carrinho[i].dish_id,
+                    quantity: carrinho[i].quantity
+                })
+            }
+
+            const response = await fetch("/orders", {
+                method: "POST",
+                headers: { "Content-type": "application/json" },
+                body: JSON.stringify({
+                    restaurant_id: restauranteAtual,
+                    payment_method: document.querySelector("#pagamento").value,
+                    notes: document.querySelector("#obs").value,
+                    street: document.querySelector("#rua").value,
+                    number: document.querySelector("#numero").value,
+                    neighborhood: document.querySelector("#bairro").value,
+                    city: document.querySelector("#cidade").value,
+                    items: itens
+                })
+            })
+
+            const data = await response.json()
+
+            if (!response.ok) {
+                alert("Erro ao fazer o pedido")
+                return
+            }
+
+            alert("Pedido #" + data.id + " feito! Total: R$ " + data.total.toFixed(2))
+
+            carrinho = []
+            mostrarCarrinho()
+            carregarPedidos()
+        }
+
+        // Mostra o histórico de pedidos
+        async function carregarPedidos() {
+            const response = await fetch("/orders")
+            const lista = await response.json()
+
+            let html = ""
+
+            for (let i = 0; i < lista.length; i++) {
+                const p = lista[i]
+
+                html += '<div class="order-card">'
+                html += '<span><b>Pedido #' + p.id + '</b> - ' + p.restaurant + '</span>'
+                html += '<span>R$ ' + p.total.toFixed(2) + '</span>'
+                html += '<span class="badge status-' + p.status + '">' + p.status + '</span>'
+                html += '</div>'
+            }
+
+            if (html == "") {
+                html = '<p class="empty">Você ainda não fez pedidos.</p>'
+            }
+
+            document.querySelector("#pedidos").innerHTML = html
+        }
+
+        init()
+    </script>
+</body>
+
+</html>

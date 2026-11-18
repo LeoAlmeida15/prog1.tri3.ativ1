@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Login</title>
+    <link rel="stylesheet" href="./style.css">
+</head>
+
+<body>
+    <div class="auth-page">
+        <div class="auth-card">
+            <h1>Fome<span style="color:#e8363d">Já</span></h1>
+            <p class="sub">Peça de vários restaurantes em um só lugar</p>
+
+            <div class="tabs">
+                <button id="tabLogin" class="active" onclick="mostrar('login')">Entrar</button>
+                <button id="tabCadastro" onclick="mostrar('cadastro')">Cadastrar</button>
+            </div>
+
+            <form id="frmLogin">
+                <input type="text" name="username" placeholder="usuário">
+                <input type="password" name="password" placeholder="senha">
+                <button class="btn">entrar</button>
+            </form>
+
+            <form id="frmCadastro" class="hidden">
+                <input type="text" name="username" placeholder="escolha um usuário">
+                <input type="password" name="password" placeholder="escolha uma senha">
+                <button class="btn">cadastrar-se</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        const frmLogin = document.querySelector('#frmLogin')
+        const frmCadastro = document.querySelector('#frmCadastro')
+
+        // Alterna entre as abas Entrar / Cadastrar
+        function mostrar(aba) {
+            frmLogin.classList.toggle('hidden', aba != 'login')
+            frmCadastro.classList.toggle('hidden', aba != 'cadastro')
+            document.querySelector('#tabLogin').classList.toggle('active', aba == 'login')
+            document.querySelector('#tabCadastro').classList.toggle('active', aba == 'cadastro')
+        }
+
+        frmLogin.addEventListener('submit', async (ev) => {
+            ev.preventDefault()
+
+            const response = await fetch("/login", {
+                method: "POST",
+                headers: { "Content-type": "application/json" },
+                body: JSON.stringify({
+                    "username": frmLogin.username.value,
+                    "password": frmLogin.password.value
+                })
+            })
+
+            if (response.status == 404)
+                return alert("Usuário não encontrado")
+
+            if (response.status == 401)
+                return alert("Senha incorreta")
+
+            if (response.ok) {
+                window.location.href = "/home"
+                return
+            }
+
+            alert("Não deveria chegar aqui")
+        })
+
+        frmCadastro.addEventListener('submit', async (ev) => {
+            ev.preventDefault()
+
+            const response = await fetch("/user", {
+                method: "POST",
+                headers: { "Content-type": "application/json" },
+                body: JSON.stringify({
+                    "username": frmCadastro.username.value,
+                    "password": frmCadastro.password.value
+                })
+            })
+
+            if (response.ok) {
+                alert("Cadastro feito! Agora é só entrar.")
+                frmCadastro.reset()
+                mostrar('login')
+                return
+            }
+
+            const erro = await response.json()
+            alert(erro.msg)
+        })
+    </script>
+</body>
+
+</html>
